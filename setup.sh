@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# This script schedules the contribution script to run 3-7 times/day
-# using a combination of systemd timer or crontab fallback.
-
-SCRIPT_DIR="/home/victor-pym/文档/Project/GitCG"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONTRIBUTE_SCRIPT="$SCRIPT_DIR/contribute.sh"
 
 chmod +x "$CONTRIBUTE_SCRIPT"
 
-# Create the systemd user service and timer
+# Detect branch name
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+# Update contribute.sh to use correct branch
+sed -i "s|git push origin .*|git push origin $BRANCH --quiet|g" "$CONTRIBUTE_SCRIPT"
+
 mkdir -p ~/.config/systemd/user
 
-cat > ~/.config/systemd/user/github-contribute.service << 'EOF'
+cat > ~/.config/systemd/user/github-contribute.service << EOF
 [Unit]
 Description=GitHub Contribution Wall Auto Commit
 
 [Service]
 Type=oneshot
-ExecStart=/home/victor-pym/文档/Project/GitCG/contribute.sh
-WorkingDirectory=/home/victor-pym/文档/Project/GitCG
+ExecStart=$CONTRIBUTE_SCRIPT
+WorkingDirectory=$SCRIPT_DIR
 EOF
 
 cat > ~/.config/systemd/user/github-contribute.timer << 'EOF'
@@ -38,10 +39,6 @@ EOF
 systemctl --user daemon-reload
 systemctl --user enable --now github-contribute.timer
 
-echo "Systemd timer enabled. It will fire during 08:00-22:00 with randomized delays."
-echo "Timer will trigger roughly 14 times, each with randomized delay (0-30min),"
-echo "and the script itself picks random delays between commits."
-echo ""
-echo "Status: systemctl --user status github-contribute.timer"
-echo "Logs:   journalctl --user -u github-contribute"
-echo "Manual: $CONTRIBUTE_SCRIPT"
+echo "Done! Timer enabled."
+echo "Manual run: $CONTRIBUTE_SCRIPT"
+echo "Logs: journalctl --user -u github-contribute"
